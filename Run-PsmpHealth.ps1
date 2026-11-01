@@ -21,7 +21,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $Script:Root = $PSScriptRoot
-$Script:Ver = '0.1.0'
+$Script:Ver = '0.1.1'
 $Script:SshPath = ''            # normally ssh.exe from PATH; the self-test points this at a fake ssh
 $Script:SafeValue = '^[A-Za-z0-9._:@/ -]*$'
 $Script:HostOk = '^[A-Za-z0-9._:-]{1,253}$'

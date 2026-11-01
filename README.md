@@ -1,4 +1,4 @@
-# psmphealth for Windows PowerShell (v0.1.0, UNTESTED on a live PSMP)
+# psmphealth for Windows PowerShell (v0.1.1; one live PSMP login passed with the passcode + reason prompts)
 
 PSMP end-user health test for Windows 11 / Windows PowerShell 5.1. It needs no extra modules: it drives the built-in OpenSSH client `ssh.exe`.
 Same CSV and `env.json` layout as the Linux tool (see the Linux README for the column list).
@@ -34,6 +34,6 @@ Exit code 0 = all passed, 1 = a failure.
 `mail.send_on`: `always` (mail every run, subject `ALL OK (n tests)`) or `failure` (only when a row failed). No repeat/recovery tracking in this version.
 
 ## Known limits (v0.1)
-* Not tested against a live PSMP from Windows. The one unknown: whether this `ssh.exe` build passes PSMP's keyboard-interactive prompts (password, reason, passcode) to `SSH_ASKPASS`. If the log shows ssh waiting or no prompts recorded, send me `row-1.out`.
+* Verified live once (Windows 11, OpenSSH for Windows, passcode login): `ssh.exe` passes the passcode and reason prompts to the helper. The helper writes answers as raw bytes (a console-encoded answer was refused by PSMP). Only that one login type is verified so far.
 * A Duo push is approved on the phone while ssh waits (up to hold + 120 s + `test.mfa_wait_sec`). Every row sends a new push.
 * Needs a normal interactive window for `-Manual`; cannot be scheduled with it. No lock file, no retention clean-up, no CCP client-certificate test yet (`credentials.ccp.client_certificate_thumbprint` is read if you set it).
