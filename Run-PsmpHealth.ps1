@@ -162,8 +162,9 @@ $kind = 'unknown'; $a = ''
 if ($p -match '(?i)reason') { $kind = 'reason'; $a = $env:PSMPH_REASON }
 elseif ($p -match '(?i)pass\s?code|one[- ]?time|\botp\b') { $kind = 'passcode'; $a = $env:PSMPH_PASSCODE }
 elseif ($p -match '(?i)password') { $kind = 'password'; $a = $env:PSMPH_PW }
-if ($env:PSMPH_LOG) { Add-Content -LiteralPath $env:PSMPH_LOG -Value ($kind + "`t" + $p + "`t" + $a.Length) -Encoding ASCII }
-[Console]::Out.Write($a + "`n")
+$bytes = [System.Text.Encoding]::UTF8.GetBytes($a + "`n")      # raw bytes: no byte-order mark, no carriage return, whatever the console code page is
+if ($env:PSMPH_LOG) { Add-Content -LiteralPath $env:PSMPH_LOG -Value ($kind + "`t" + $p + "`t" + ($bytes.Length - 1)) -Encoding ASCII }
+$o = [Console]::OpenStandardOutput(); $o.Write($bytes, 0, $bytes.Length); $o.Flush()
 '@
     Set-Content -LiteralPath (Join-Path $Dir 'askpass.cmd') -Value $cmd -Encoding ASCII
     Set-Content -LiteralPath (Join-Path $Dir 'askpass.ps1') -Value $ps -Encoding ASCII
@@ -360,7 +361,7 @@ function Invoke-Row($Row, $Cfg, $Paths, [string]$RunDir, [string]$HelperDir, [bo
                     $ses = Invoke-Session $RV $user $pw $hold $reason $pcUse $HelperDir $plog $Paths.known_hosts $mfa
                     $prompts = @(Get-Content -LiteralPath $plog | Where-Object { $_ })
                     foreach ($l in ($ses.Out -split "`r?`n")) { if ($l.Trim()) { [void]$notes.Add('    ssh: ' + $l) } }
-                    foreach ($p in $prompts) { $pp = $p -split "`t"; [void]$notes.Add('    prompt ' + $pp[0] + ': "' + $pp[1] + '"  -> helper sent ' + $pp[2] + ' characters (value not shown)') }
+                    foreach ($p in $prompts) { $pp = $p -split "`t"; [void]$notes.Add('    prompt ' + $pp[0] + ': "' + $pp[1] + '"  -> helper sent ' + $pp[2] + ' bytes (value not shown)') }
                     $vd = Get-Verdict $ses.Out $ses.Code $ses.TimedOut $RV.TUser $hold $prompts
                     $res.Steps.login = $vd.Steps.login; $res.Steps.identity = $vd.Steps.identity; $res.Steps.hold = $vd.Steps.hold; $res.Gap = $vd.Gap
                     $res.Failed = $vd.Failed; $res.Reason = $vd.Reason; $res.Rejected = $vd.Rejected
