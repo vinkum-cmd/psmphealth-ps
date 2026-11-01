@@ -356,7 +356,8 @@ function Invoke-Row($Row, $Cfg, $Paths, [string]$RunDir, [string]$HelperDir, [bo
                 if ($res.Steps.ccp -ne 'FAIL') {
                     $plog = Join-Path $HelperDir ("prompts-row$($Row.N)-try$try.log"); Set-Content -LiteralPath $plog -Value '' -Encoding ASCII
                     & $note "connecting: $user@$($RV.TUser)@$($RV.THost) via $($RV.Psmp) (hold ${hold}s)"
-                    $ses = Invoke-Session $RV $user $pw $hold $reason $pca $HelperDir $plog $Paths.known_hosts $mfa
+                    $pcUse = $pca; if ($pca -eq 'password') { $pcUse = $pw }          # test.passcode_answer = password: the passcode prompt gets the end user password
+                    $ses = Invoke-Session $RV $user $pw $hold $reason $pcUse $HelperDir $plog $Paths.known_hosts $mfa
                     $prompts = @(Get-Content -LiteralPath $plog | Where-Object { $_ })
                     foreach ($l in ($ses.Out -split "`r?`n")) { if ($l.Trim()) { [void]$notes.Add('    ssh: ' + $l) } }
                     foreach ($p in $prompts) { $pp = $p -split "`t", 2; [void]$notes.Add('    prompt ' + $pp[0] + ': "' + $pp[1] + '"  (answered by the helper)') }

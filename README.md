@@ -10,7 +10,7 @@ checks (login, identity, session held) -> screenshot PNG -> results CSV -> one s
 
 How prompts are answered: `ssh.exe` is started with `SSH_ASKPASS` (+ `SSH_ASKPASS_REQUIRE=force`) pointing at a tiny helper. The helper answers
 * a prompt containing **reason** -> `test.reason`
-* a prompt containing **passcode / Passcode** (or one-time / OTP) -> `test.passcode_answer` (default `1` = Duo push; `"ask"` = you type the code per row)
+* a prompt containing **passcode / Passcode** (or one-time / OTP) -> `test.passcode_answer` (default `1` = Duo push; `"ask"` = you type the code per row, hidden; `"password"` = the end user password is used; with a one-time code set `reliability.retries` to 0)
 * a prompt containing **password** -> the end user password
 * anything else -> logged as `unknown` and reported in the failure reason ("PSMP asked a question the tool cannot answer: ...").
 The password lives only in memory and in the environment of the one `ssh.exe` child process (never in your PowerShell session, a command line, a file, a log, a screenshot or the mail).
