@@ -21,7 +21,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $Script:Root = $PSScriptRoot
-$Script:Ver = '0.1.1'
+$Script:Ver = '0.1.2'
 $Script:SshPath = ''            # normally ssh.exe from PATH; the self-test points this at a fake ssh
 $Script:SafeValue = '^[A-Za-z0-9._:@/ -]*$'
 $Script:HostOk = '^[A-Za-z0-9._:-]{1,253}$'
@@ -162,6 +162,7 @@ $kind = 'unknown'; $a = ''
 if ($p -match '(?i)reason') { $kind = 'reason'; $a = $env:PSMPH_REASON }
 elseif ($p -match '(?i)pass\s?code|one[- ]?time|\botp\b') { $kind = 'passcode'; $a = $env:PSMPH_PASSCODE }
 elseif ($p -match '(?i)password') { $kind = 'password'; $a = $env:PSMPH_PW }
+if ($kind -eq 'reason') { $d = 10; if ($env:PSMPH_REASON_DELAY -match '^\d+$') { $d = [int]$env:PSMPH_REASON_DELAY }; Start-Sleep -Seconds $d }   # wait after the password, before the reason
 $bytes = [System.Text.Encoding]::UTF8.GetBytes($a + "`n")      # raw bytes: no byte-order mark, no carriage return, whatever the console code page is
 if ($env:PSMPH_LOG) { Add-Content -LiteralPath $env:PSMPH_LOG -Value ($kind + "`t" + $p + "`t" + ($bytes.Length - 1)) -Encoding ASCII }
 $o = [Console]::OpenStandardOutput(); $o.Write($bytes, 0, $bytes.Length); $o.Flush()
@@ -189,6 +190,7 @@ function Invoke-Session($V, [string]$User, [string]$Pw, [int]$Hold, [string]$Rea
     $psi.EnvironmentVariables['PSMPH_REASON'] = $Reason
     $psi.EnvironmentVariables['PSMPH_PASSCODE'] = $Passcode
     $psi.EnvironmentVariables['PSMPH_LOG'] = $PromptLog
+    $psi.EnvironmentVariables['PSMPH_REASON_DELAY'] = [string]$Script:ReasonDelay
     $p = [System.Diagnostics.Process]::Start($psi)
     $p.StandardInput.Close()
     $so = $p.StandardOutput.ReadToEndAsync(); $se = $p.StandardError.ReadToEndAsync()
@@ -328,6 +330,7 @@ function Invoke-Row($Row, $Cfg, $Paths, [string]$RunDir, [string]$HelperDir, [bo
     $note = { param($m) [void]$notes.Add(('[{0:HH:mm:ss}] {1}' -f (Get-Date), $m)) }
     $hold = [int](Get-Setting $Cfg 'test.hold_seconds' 60); if ($RV.Hold -ne '') { $hold = [int]$RV.Hold }
     $reason = [string](Get-Setting $Cfg 'test.reason' 'automated psmp health test')
+    $Script:ReasonDelay = [int](Get-Setting $Cfg 'test.reason_delay_sec' 10)
     $mfa = [int](Get-Setting $Cfg 'test.mfa_wait_sec' 60)
     $user = $RV.User; if ($IsManual) { $user = $MUser }
     if ($Rejected) { $res.Failed = 'skipped'; $res.Reason = 'skipped: PSMP rejected the manual password on an earlier row (stopped to avoid locking the account)' }
@@ -408,14 +411,14 @@ function Invoke-SelfTest {
         Write-Host '3. Prompt helper (SSH_ASKPASS)'
         $hd = Join-Path $tmp 'helper'; New-Helper $hd; $ask = Join-Path $hd 'askpass.cmd'; $plog = Join-Path $tmp 'p.log'; Set-Content $plog '' -Encoding ASCII
         $nasty = 'a&b|c%d!e^f"g h'
-        $env:PSMPH_PW = $nasty; $env:PSMPH_REASON = 'why not'; $env:PSMPH_PASSCODE = '1'; $env:PSMPH_LOG = $plog
+        $env:PSMPH_PW = $nasty; $env:PSMPH_REASON = 'why not'; $env:PSMPH_PASSCODE = '1'; $env:PSMPH_LOG = $plog; $env:PSMPH_REASON_DELAY = '0'
         try {
             $a1 = ((& $ask '(u@t@h@p) Vault Password:') | Select-Object -First 1); Check 'password prompt answered (special characters intact)' ($a1 -eq $nasty) "got [$a1]"
             $a2 = ((& $ask '(u@t@h@p) You are required to specify a reason for this operation:') | Select-Object -First 1); Check 'reason prompt answered' ($a2 -eq 'why not')
             $a3 = ((& $ask 'Duo Passcode or option (1-1):') | Select-Object -First 1); Check 'Passcode prompt answered' ($a3 -eq '1')
             $a3b = ((& $ask 'enter your passcode:') | Select-Object -First 1); Check 'passcode (lower case) answered' ($a3b -eq '1')
             $a4 = ((& $ask 'Something strange?') | Select-Object -First 1); Check 'unknown prompt answered with nothing' ([string]$a4 -eq '')
-        } finally { Remove-Item Env:PSMPH_PW, Env:PSMPH_REASON, Env:PSMPH_PASSCODE, Env:PSMPH_LOG -ErrorAction SilentlyContinue }
+        } finally { Remove-Item Env:PSMPH_PW, Env:PSMPH_REASON, Env:PSMPH_PASSCODE, Env:PSMPH_LOG, Env:PSMPH_REASON_DELAY -ErrorAction SilentlyContinue }
         $kinds = @(Get-Content $plog | Where-Object { $_ } | ForEach-Object { ($_ -split "`t")[0] }); Check 'prompt log records kinds, not answers' (($kinds -join ',') -eq 'password,reason,passcode,passcode,unknown' -and -not ((Get-Content $plog -Raw) -like "*$nasty*"))
         Write-Host '4. Verdicts'
         $v = Get-Verdict "S1 1000 root`nS2 1060 root" 0 $false 'root' 60 @(); Check 'PASS output' ($v.Steps.login -eq 'OK' -and $v.Steps.identity -eq 'OK' -and $v.Steps.hold -eq 'OK' -and $v.Gap -eq 60 -and -not $v.Failed)
@@ -438,7 +441,7 @@ $t = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 '@ -Encoding ASCII
         Set-Content (Join-Path $tmp 'fake-ssh.cmd') "@echo off`r`npowershell.exe -NoProfile -ExecutionPolicy Bypass -File `"%~dp0fake-ssh.ps1`" %*" -Encoding ASCII
         $Script:SshPath = Join-Path $tmp 'fake-ssh.cmd'
-        $S = ('{"test":{"hold_seconds":10,"reason":"selftest reason","passcode_answer":"1","mfa_wait_sec":5},"reliability":{"retries":0},"prechecks":{"enabled":false},"outputs":{"screenshots":"all"}}' | ConvertFrom-Json)
+        $S = ('{"test":{"hold_seconds":10,"reason":"selftest reason","passcode_answer":"1","mfa_wait_sec":5,"reason_delay_sec":0},"reliability":{"retries":0},"prechecks":{"enabled":false},"outputs":{"screenshots":"all"}}' | ConvertFrom-Json)
         $paths = @{ known_hosts = (Join-Path $tmp 'kh') }; $rd = Join-Path $tmp 'run'; New-Item -ItemType Directory -Path $rd | Out-Null
         Set-Content $f "TargetUser,TargetServer`nroot,srv1" -Encoding ASCII; $row = (@(Read-Rows $f @{ Psmp = 'psmp.test' } $true))[0]
         $env:PSMPH_FAKE_EXPECT = 'Right Pw!'; $env:PSMPH_FAKE_USER = 'root'; $env:PSMPH_FAKE_MFA = '1'

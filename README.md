@@ -1,4 +1,4 @@
-# psmphealth for Windows PowerShell (v0.1.1; one live PSMP login passed with the passcode + reason prompts)
+# psmphealth for Windows PowerShell (v0.1.2; one live PSMP login passed with the passcode + reason prompts)
 
 PSMP end-user health test for Windows 11 / Windows PowerShell 5.1. It needs no extra modules: it drives the built-in OpenSSH client `ssh.exe`.
 Same CSV and `env.json` layout as the Linux tool (see the Linux README for the column list).
@@ -11,6 +11,7 @@ checks (login, identity, session held) -> screenshot PNG -> results CSV -> one s
 How prompts are answered: `ssh.exe` is started with `SSH_ASKPASS` (+ `SSH_ASKPASS_REQUIRE=force`) pointing at a tiny helper. The helper answers
 * a prompt containing **reason** -> `test.reason`
 * a prompt containing **passcode / Passcode** (or one-time / OTP) -> `test.passcode_answer` (default `password` = the end user password, which is what a passcode prompt wants on most setups; `"ask"` = you type the code per row, hidden; a fixed value such as `1` for a Duo push; with a one-time code set `reliability.retries` to 0)
+* after the password is sent, the helper waits `test.reason_delay_sec` seconds (default 10) before it answers the reason prompt
 * a prompt containing **password** -> the end user password
 * anything else -> logged as `unknown` and reported in the failure reason ("PSMP asked a question the tool cannot answer: ...").
 The password lives only in memory and in the environment of the one `ssh.exe` child process (never in your PowerShell session, a command line, a file, a log, a screenshot or the mail).
