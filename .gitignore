@@ -1,0 +1,6 @@
+envs/*
+!envs/example
+!envs/example/**
+logs/
+results/
+known_hosts
