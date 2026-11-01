@@ -162,7 +162,7 @@ $kind = 'unknown'; $a = ''
 if ($p -match '(?i)reason') { $kind = 'reason'; $a = $env:PSMPH_REASON }
 elseif ($p -match '(?i)pass\s?code|one[- ]?time|\botp\b') { $kind = 'passcode'; $a = $env:PSMPH_PASSCODE }
 elseif ($p -match '(?i)password') { $kind = 'password'; $a = $env:PSMPH_PW }
-if ($env:PSMPH_LOG) { Add-Content -LiteralPath $env:PSMPH_LOG -Value ($kind + "`t" + $p) -Encoding ASCII }
+if ($env:PSMPH_LOG) { Add-Content -LiteralPath $env:PSMPH_LOG -Value ($kind + "`t" + $p + "`t" + $a.Length) -Encoding ASCII }
 [Console]::Out.Write($a + "`n")
 '@
     Set-Content -LiteralPath (Join-Path $Dir 'askpass.cmd') -Value $cmd -Encoding ASCII
@@ -208,7 +208,7 @@ function Get-Verdict([string]$Text, [int]$Code, [bool]$TimedOut, [string]$TUser,
         $r.Failed = 'login'
         $am = [regex]::Match($Text, 'Failed to obtain account[^\r\n]{0,260}')
         if ($pw -ge 2) { $r.Reason = 'login: password prompted again - login rejected'; $r.Rejected = $true }
-        elseif ($unk.Count -gt 0) { $r.Reason = "login: PSMP asked a question the tool cannot answer: '" + ($unk[0] -replace "^unknown`t", '') + "'" }
+        elseif ($unk.Count -gt 0) { $r.Reason = "login: PSMP asked a question the tool cannot answer: '" + (($unk[0] -split "`t")[1]) + "'" }
         elseif ($am.Success) { $r.Reason = 'login: ' + $am.Value }
         elseif ($Text -match '(?i)permission denied|access denied') { $r.Reason = 'login: permission denied (check user, password and target account)'; $r.Rejected = $true }
         elseif ($TimedOut) { $r.Reason = 'login: timed out waiting for the login (approve the MFA push in time, or raise test.mfa_wait_sec)' }
@@ -360,7 +360,7 @@ function Invoke-Row($Row, $Cfg, $Paths, [string]$RunDir, [string]$HelperDir, [bo
                     $ses = Invoke-Session $RV $user $pw $hold $reason $pcUse $HelperDir $plog $Paths.known_hosts $mfa
                     $prompts = @(Get-Content -LiteralPath $plog | Where-Object { $_ })
                     foreach ($l in ($ses.Out -split "`r?`n")) { if ($l.Trim()) { [void]$notes.Add('    ssh: ' + $l) } }
-                    foreach ($p in $prompts) { $pp = $p -split "`t", 2; [void]$notes.Add('    prompt ' + $pp[0] + ': "' + $pp[1] + '"  (answered by the helper)') }
+                    foreach ($p in $prompts) { $pp = $p -split "`t"; [void]$notes.Add('    prompt ' + $pp[0] + ': "' + $pp[1] + '"  -> helper sent ' + $pp[2] + ' characters (value not shown)') }
                     $vd = Get-Verdict $ses.Out $ses.Code $ses.TimedOut $RV.TUser $hold $prompts
                     $res.Steps.login = $vd.Steps.login; $res.Steps.identity = $vd.Steps.identity; $res.Steps.hold = $vd.Steps.hold; $res.Gap = $vd.Gap
                     $res.Failed = $vd.Failed; $res.Reason = $vd.Reason; $res.Rejected = $vd.Rejected
