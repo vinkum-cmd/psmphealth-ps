@@ -6,7 +6,7 @@
   for the hold time, run whoami again. Result CSV, a terminal-style screenshot per row and one status mail.
   The end user password comes from CCP (default) or is typed once with -Manual (user name + hidden password).
   Prompts are answered by a tiny helper (SSH_ASKPASS): "reason" -> test.reason, "passcode"/"Passcode" -> test.passcode_answer
-  (default 1 = Duo push), "password" -> the end user password. Any other question is logged and reported, never guessed.
+  (default = the end user password), "password" -> the end user password. Any other question is logged and reported, never guessed.
   The command run on the target is fixed in this script. Nothing in env.json or the CSV is ever executed.
 .EXAMPLE
   .\Run-PsmpHealth.ps1 -Env prod -Validate
@@ -338,7 +338,7 @@ function Invoke-Row($Row, $Cfg, $Paths, [string]$RunDir, [string]$HelperDir, [bo
         else {
             $maxtry = 1 + [int](Get-Setting $Cfg 'reliability.retries' 1); if ($Row.Retries -ge 0) { $maxtry = 1 + $Row.Retries }
             $wait = [int](Get-Setting $Cfg 'reliability.retry_wait_sec' 30)
-            $pca = [string](Get-Setting $Cfg 'test.passcode_answer' '1')
+            $pca = [string](Get-Setting $Cfg 'test.passcode_answer' 'password')
             if ($pca -eq 'ask') { $x = Read-Host "Row $($Row.N): passcode / OTP now (Enter = 1, Duo push)" -AsSecureString; $pca = ConvertTo-Plain $x; if (-not $pca) { $pca = '1' } }
             for ($try = 1; $try -le $maxtry; $try++) {
                 $res.Attempts = $try; $res.Failed = ''; $res.Reason = ''; $res.Rejected = $false; $res.Steps = @{ ccp = 'not run'; login = 'not run'; identity = 'not run'; hold = 'not run' }
