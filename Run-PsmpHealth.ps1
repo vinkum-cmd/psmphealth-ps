@@ -359,7 +359,7 @@ function Invoke-Row($Row, $Cfg, $Paths, [string]$RunDir, [string]$HelperDir, [bo
                     $ses = Invoke-Session $RV $user $pw $hold $reason $pca $HelperDir $plog $Paths.known_hosts $mfa
                     $prompts = @(Get-Content -LiteralPath $plog | Where-Object { $_ })
                     foreach ($l in ($ses.Out -split "`r?`n")) { if ($l.Trim()) { [void]$notes.Add('    ssh: ' + $l) } }
-                    foreach ($p in $prompts) { [void]$notes.Add('    prompt: ' + (($p -split "`t", 2)[0]) + ' answered') }
+                    foreach ($p in $prompts) { $pp = $p -split "`t", 2; [void]$notes.Add('    prompt ' + $pp[0] + ': "' + $pp[1] + '"  (answered by the helper)') }
                     $vd = Get-Verdict $ses.Out $ses.Code $ses.TimedOut $RV.TUser $hold $prompts
                     $res.Steps.login = $vd.Steps.login; $res.Steps.identity = $vd.Steps.identity; $res.Steps.hold = $vd.Steps.hold; $res.Gap = $vd.Gap
                     $res.Failed = $vd.Failed; $res.Reason = $vd.Reason; $res.Rejected = $vd.Rejected
