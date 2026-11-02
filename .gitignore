@@ -4,3 +4,4 @@ envs/*
 logs/
 results/
 known_hosts
+dist/
